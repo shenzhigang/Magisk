@@ -9,6 +9,7 @@
 
 #include <magisk.hpp>
 #include <utils.hpp>
+#include <selinux.hpp>
 #include <db.hpp>
 
 #include "magiskhide.hpp"
@@ -17,6 +18,8 @@ using namespace std;
 
 static pthread_t proc_monitor_thread;
 static bool hide_state = false;
+string system_mnt_type;
+string system_root_mnt_type;
 
 // This locks the 2 variables above
 static pthread_mutex_t hide_state_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -87,55 +90,59 @@ static bool validate(const char *s) {
 	return dot;
 }
 
-static int add_list(const char *pkg, const char *proc = "") {
+static void init_list(int uid, const char *pkg, const char *proc);
+
+static int add_list(int uid, const char *pkg, const char *proc = "") {
 	if (proc[0] == '\0')
 		proc = pkg;
 
-	if (!validate(pkg) || !validate(proc))
+	if (uid % 100000 < 10000 || uid % 100000 > 19999 || !validate(pkg) || !validate(proc))
 		return HIDE_INVALID_PKG;
 
 	for (auto &hide : hide_set)
-		if (hide.first == pkg && hide.second == proc)
+		if (hide.first == uid && hide.second.first == pkg && hide.second.second == proc)
 			return HIDE_ITEM_EXIST;
 
 	// Add to database
 	char sql[4096];
 	snprintf(sql, sizeof(sql),
-			"INSERT INTO hidelist (package_name, process) VALUES('%s', '%s')", pkg, proc);
+			 "INSERT INTO sulist (uid, package_name, process, logging, notification) "
+			 "VALUES('%d', '%s', '%s', 1, 1)", uid, pkg, proc);
 	char *err = db_exec(sql);
 	db_err_cmd(err, return DAEMON_ERROR);
 
-	LOGI("hide_list add: [%s/%s]\n", pkg, proc);
+	LOGI("su_list add: UID=%d [%s/%s]\n", uid, pkg, proc);
 
 	// Critical region
 	{
 		mutex_guard lock(monitor_lock);
-		hide_set.emplace(pkg, proc);
+		init_list(uid, pkg, proc);
 	}
 
-	kill_process(proc);
 	return DAEMON_SUCCESS;
 }
 
 int add_list(int client) {
+	int uid = read_int(client);
 	char *pkg = read_string(client);
 	char *proc = read_string(client);
-	int ret = add_list(pkg, proc);
+	int ret = add_list(uid, pkg, proc);
 	free(pkg);
 	free(proc);
 	update_uid_map();
 	return ret;
 }
 
-static int rm_list(const char *pkg, const char *proc = "") {
+static int rm_list(int uid, const char *pkg, const char *proc = "") {
 	{
 		// Critical region
 		mutex_guard lock(monitor_lock);
 		bool remove = false;
 		for (auto it = hide_set.begin(); it != hide_set.end();) {
-			if (it->first == pkg && (proc[0] == '\0' || it->second == proc)) {
+			if (it->first == uid && it->second.first == pkg &&
+				(proc[0] == '\0' || it->second.second == proc)) {
 				remove = true;
-				LOGI("hide_list rm: [%s]\n", it->second.data());
+				LOGI("su_list rm: UID=%d [%s]\n", it->first, it->second.second.data());
 				it = hide_set.erase(it);
 			} else {
 				++it;
@@ -147,19 +154,21 @@ static int rm_list(const char *pkg, const char *proc = "") {
 
 	char sql[4096];
 	if (proc[0] == '\0')
-		snprintf(sql, sizeof(sql), "DELETE FROM hidelist WHERE package_name='%s'", pkg);
-	else
-		snprintf(sql, sizeof(sql),
-				"DELETE FROM hidelist WHERE package_name='%s' AND process='%s'", pkg, proc);
+		snprintf(sql, sizeof(sql), "DELETE FROM sulist WHERE uid='%d' AND package_name='%s'",
+				uid, pkg);
+	else snprintf(sql, sizeof(sql),
+		         "DELETE FROM sulist WHERE uid='%d' AND package_name='%s' AND process='%s'",
+		         uid, pkg, proc);
 	char *err = db_exec(sql);
 	db_err(err);
 	return DAEMON_SUCCESS;
 }
 
 int rm_list(int client) {
+	int uid = read_int(client);
 	char *pkg = read_string(client);
 	char *proc = read_string(client);
-	int ret = rm_list(pkg, proc);
+	int ret = rm_list(uid, pkg, proc);
 	free(pkg);
 	free(proc);
 	if (ret == DAEMON_SUCCESS)
@@ -167,9 +176,20 @@ int rm_list(int client) {
 	return ret;
 }
 
-static void init_list(const char *pkg, const char *proc) {
-	LOGI("hide_list init: [%s/%s]\n", pkg, proc);
-	hide_set.emplace(pkg, proc);
+static void init_list(int uid, const char *pkg, const char *proc) {
+	if (multiuser_mode == -1) {
+		db_settings dbs;
+		get_db_settings(dbs, SU_MULTIUSER_MODE);
+		multiuser_mode = dbs[SU_MULTIUSER_MODE];
+	}
+
+	if (uid == 2000 || (multiuser_mode != MULTIUSER_MODE_USER && uid >= 100000)) {
+		LOGW("su_list init: ignore init UID=%d %s", uid, pkg);
+		return;
+	}
+
+	LOGI("su_list init: UID=%d [%s/%s]\n", uid, pkg, proc);
+	hide_set.emplace(uid, make_pair(pkg, proc));
 	kill_process(proc);
 }
 
@@ -178,10 +198,10 @@ static void init_list(const char *pkg, const char *proc) {
 #define MICROG_PKG   "org.microg.gms.droidguard"
 
 static bool init_list() {
-	LOGD("hide_list: initialize\n");
+	LOGD("su_list: initialize\n");
 
-	char *err = db_exec("SELECT * FROM hidelist", [](db_row &row) -> bool {
-		init_list(row["package_name"].data(), row["process"].data());
+	char *err = db_exec("SELECT * FROM sulist", [](db_row &row) -> bool {
+		init_list(parse_int(row["uid"]), row["package_name"].data(), row["process"].data());
 		return true;
 	});
 	db_err_cmd(err, return false);
@@ -192,14 +212,16 @@ static bool init_list() {
 		kill_process("usap64", true);
 	}
 
-	// Add SafetyNet by default
-	init_list(GMS_PKG, SNET_PROC);
-	init_list(MICROG_PKG, SNET_PROC);
+	kill_process(SNET_PROC);
+	kill_process(GMS_PKG);
+	kill_process(MICROG_PKG);
 
-	// We also need to hide the default GMS process if MAGISKTMP != /sbin
-	// The snet process communicates with the main process and get additional info
-	if (MAGISKTMP != "/sbin")
-		init_list(GMS_PKG, GMS_PKG);
+	db_strings str;
+	struct stat st{};
+	get_db_strings(str, SU_MANAGER);
+	if (validate_manager(str[SU_MANAGER], 0, &st)) {
+		init_list(st.st_uid, str[SU_MANAGER].data(), str[SU_MANAGER].data());
+	}
 
 	update_uid_map();
 	return true;
@@ -208,7 +230,7 @@ static bool init_list() {
 void ls_list(int client) {
 	FILE *out = fdopen(recv_fd(client), "a");
 	for (auto &hide : hide_set)
-		fprintf(out, "%s|%s\n", hide.first.data(), hide.second.data());
+		fprintf(out, "%d|%s|%s\n", hide.first, hide.second.first.data(), hide.second.second.data());
 	fclose(out);
 	write_int(client, DAEMON_SUCCESS);
 	close(client);
@@ -220,6 +242,57 @@ static void update_hide_config() {
 			DB_SETTING_KEYS[HIDE_CONFIG], hide_state);
 	char *err = db_exec(sql);
 	db_err(err);
+}
+
+static void copy_magisk_tmp() {
+	string tmp_dir;
+	char buf[8];
+	gen_rand_str(buf, sizeof(buf));
+	tmp_dir = "/dev/"s + buf;
+	xmkdir(tmp_dir.data(), 0);
+	setfilecon(tmp_dir.data(), "u:object_r:tmpfs:s0");
+
+	SUMODULE = tmp_dir;
+	chdir(tmp_dir.data());
+
+	xmkdir(INTLROOT, 0755);
+	xmkdir(MIRRDIR, 0);
+	xmkdir(BLOCKDIR, 0);
+
+	for (auto file : {"magisk", "magiskinit"}) {
+		auto src = MAGISKTMP + "/"s + file;
+		auto dest = tmp_dir + "/"s + file;
+		cp_afc(src.data(), dest.data());
+		if (file == "magisk"sv) setfilecon(dest.data(), "u:object_r:" SEPOL_EXEC_TYPE ":s0");
+	}
+
+	parse_mnt("/proc/mounts", [&](mntent *me) {
+		struct stat st{};
+		if ((me->mnt_dir == string_view("/system")) && me->mnt_type != "tmpfs"sv &&
+			lstat(me->mnt_dir, &st) == 0) {
+			mknod(BLOCKDIR "/system", S_IFBLK | 0600, st.st_dev);
+			xmkdir(MIRRDIR "/system", 0755);
+			system_mnt_type = me->mnt_type;
+			return false;
+		}
+		return true;
+	});
+	if (access(MIRRDIR "/system", F_OK) != 0) {
+		xsymlink("./system_root/system", MIRRDIR "/system");
+		parse_mnt("/proc/mounts", [&](mntent *me) {
+			struct stat st{};
+			if ((me->mnt_dir == string_view("/")) && me->mnt_type != "rootfs"sv &&
+				stat("/", &st) == 0) {
+				mknod(BLOCKDIR "/system_root", S_IFBLK | 0600, st.st_dev);
+				xmkdir(MIRRDIR "/system_root", 0755);
+				system_root_mnt_type = me->mnt_type;
+				return false;
+			}
+			return true;
+		});
+	}
+
+	chdir("/");
 }
 
 int launch_magiskhide() {
@@ -246,6 +319,8 @@ int launch_magiskhide() {
 	if (!init_list())
 		return DAEMON_ERROR;
 
+	copy_magisk_tmp();
+
 	hide_sensitive_props();
 	if (DAEMON_STATE >= STATE_BOOT_COMPLETE || DAEMON_STATE == STATE_NONE)
 		hide_late_sensitive_props();
@@ -270,13 +345,13 @@ int stop_magiskhide() {
 
 	hide_state = false;
 	update_hide_config();
+	rm_rf(SUMODULE.data());
 	return DAEMON_SUCCESS;
 }
 
 void auto_start_magiskhide() {
 	if (hide_enabled()) {
-		pthread_kill(proc_monitor_thread, SIGALRM);
-		hide_late_sensitive_props();
+		return;
 	} else if (SDK_INT >= 19) {
 		db_settings dbs;
 		get_db_settings(dbs, HIDE_CONFIG);

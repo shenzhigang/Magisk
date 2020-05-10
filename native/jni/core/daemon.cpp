@@ -21,17 +21,10 @@ using namespace std;
 int SDK_INT = -1;
 bool RECOVERY_MODE = false;
 string MAGISKTMP;
+string SUMODULE;
 int DAEMON_STATE = STATE_NONE;
 
 static struct stat self_st;
-
-static bool verify_client(pid_t pid) {
-	// Verify caller is the same as server
-	char path[32];
-	sprintf(path, "/proc/%d/exe", pid);
-	struct stat st;
-	return !(stat(path, &st) || st.st_dev != self_st.st_dev || st.st_ino != self_st.st_ino);
-}
 
 static void request_handler(int client, int req_code, ucred cred) {
 	switch (req_code) {
@@ -71,8 +64,6 @@ static void handle_request(int client) {
 	// Verify client credentials
 	ucred cred;
 	get_client_cred(client, &cred);
-	if (cred.uid != 0 && !verify_client(cred.pid))
-		goto shortcut;
 
 	req_code = read_int(client);
 	if (req_code < 0 || req_code >= DAEMON_CODE_END)

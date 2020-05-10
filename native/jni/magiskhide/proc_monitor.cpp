@@ -14,6 +14,7 @@
 #include <bitset>
 
 #include <utils.hpp>
+#include <db.hpp>
 
 #include "magiskhide.hpp"
 
@@ -28,11 +29,12 @@ static void new_zygote(int pid);
  * All data structures
  **********************/
 
-set<pair<string, string>> hide_set;                 /* set of <pkg, process> pair */
+set<pair<int, pair<string, string>>> hide_set;      /* set of <uid, <pkg, process>> pair */
 static map<int, struct stat> zygote_map;            /* zygote pid -> mnt ns */
 static map<int, vector<string_view>> uid_proc_map;  /* uid -> list of process */
 
 pthread_mutex_t monitor_lock;
+int multiuser_mode = -1;
 
 #define PID_MAX 32768
 struct pid_set {
@@ -87,21 +89,23 @@ void update_uid_map() {
 	mutex_guard lock(monitor_lock);
 	uid_proc_map.clear();
 	string data_path(APP_DATA_DIR);
+	data_path += "/";
 	size_t len = data_path.length();
-	auto dir = open_dir(APP_DATA_DIR);
-	for (dirent *entry; (entry = xreaddir(dir.get()));) {
-		data_path.resize(len);
-		data_path += '/';
-		data_path += entry->d_name;
-		data_path += '/';
-		size_t user_len = data_path.length();
-		struct stat st;
-		for (auto &hide : hide_set) {
-			data_path.resize(user_len);
-			data_path += hide.first;
-			if (stat(data_path.data(), &st))
-				continue;
-			uid_proc_map[st.st_uid].emplace_back(hide.second);
+	struct stat st;
+	for (auto &hide : hide_set) {
+		data_path.erase(data_path.begin() + len, data_path.end());
+		int userid = hide.first / 100000;
+		data_path += to_string(userid) + "/" + hide.second.first;
+		if (stat(data_path.data(), &st) == 0 && hide.first == st.st_uid) {
+			uid_proc_map[st.st_uid].emplace_back(hide.second.second);
+		} else {
+			LOGW("UID=%d %s not found, remove!", hide.first, hide.second.first.data());
+			hide_set.erase(hide);
+			char sql[4096];
+			snprintf(sql, sizeof(sql), "DELETE FROM sulist WHERE uid='%d' AND package_name='%s'",
+			         hide.first, hide.second.first.data());
+			char *err = db_exec(sql);
+			db_err(err);
 		}
 	}
 }
@@ -246,8 +250,14 @@ static bool check_pid(int pid) {
 		cmdline == "usap32"sv || cmdline == "usap64"sv)
 		return false;
 
+	if (multiuser_mode == MULTIUSER_MODE_OWNER_ONLY && st.st_uid >= 100000) {
+		detach_pid(pid);
+		return true;
+	}
+
 	int uid = st.st_uid;
-	auto it = uid_proc_map.find(uid);
+	auto it = uid_proc_map.find(
+			multiuser_mode == MULTIUSER_MODE_OWNER_MANAGED ? uid % 100000 : uid);
 	if (it != uid_proc_map.end()) {
 		for (auto &s : it->second) {
 			if (s == cmdline) {
@@ -271,7 +281,7 @@ static bool check_pid(int pid) {
 				PTRACE_LOG("target found\n");
 				LOGI("proc_monitor: [%s] PID=[%d] UID=[%d]\n", cmdline, pid, uid);
 				detach_pid(pid, SIGSTOP);
-				hide_daemon(pid);
+				su_daemon(pid);
 				return true;
 			}
 		}
@@ -314,6 +324,7 @@ static void new_zygote(int pid) {
 
 	LOGD("proc_monitor: ptrace zygote PID=[%d]\n", pid);
 	zygote_map[pid] = st;
+	hide_daemon(pid);
 
 	xptrace(PTRACE_ATTACH, pid);
 

@@ -34,12 +34,15 @@ void set_hide_state(bool state);
 
 // Hide policies
 void hide_daemon(int pid);
+void su_daemon(int pid);
 void hide_unmount(int pid = getpid());
 void hide_sensitive_props();
 void hide_late_sensitive_props();
 
 extern pthread_mutex_t monitor_lock;
-extern std::set<std::pair<std::string, std::string>> hide_set;
+extern std::set<std::pair<int, std::pair<std::string, std::string>>> hide_set;
+extern std::string system_mnt_type;
+extern std::string system_root_mnt_type;
 
 enum {
 	LAUNCH_MAGISKHIDE,
