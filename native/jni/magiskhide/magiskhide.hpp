@@ -39,6 +39,7 @@ void hide_unmount(int pid = getpid());
 void hide_sensitive_props();
 void hide_late_sensitive_props();
 
+extern int multiuser_mode;
 extern pthread_mutex_t monitor_lock;
 extern std::set<std::pair<int, std::pair<std::string, std::string>>> hide_set;
 extern std::string system_mnt_type;
@@ -59,5 +60,6 @@ enum {
 	HIDE_ITEM_EXIST,
 	HIDE_ITEM_NOT_EXIST,
 	HIDE_NO_NS,
-	HIDE_INVALID_PKG
+	HIDE_INVALID_PKG,
+	HIDE_NO_SUPPORT
 };

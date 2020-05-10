@@ -22,10 +22,9 @@ using namespace std::literals;
 		"Actions:\n"
   		"   status          Return the status of magiskhide\n"
 		"   enable          Start magiskhide\n"
-		"   disable         Stop magiskhide\n"
-		"   add PKG [PROC]  Add a new target to the hide list\n"
-		"   rm PKG [PROC]   Remove target(s) from the hide list\n"
-		"   ls              Print the current hide list\n"
+		"   add UID PKG [PROC]  Add a new target to the su list\n"
+		"   rm UID PKG [PROC]   Remove target(s) from the su list\n"
+		"   ls              Print the current su list\n"
 		"   exec CMDs...    Execute commands in isolated mount\n"
 		"                   namespace and do all hide unmounts\n"
 #ifdef MAGISK_DEBUG
@@ -56,7 +55,7 @@ void magiskhide_handler(int client) {
 		res = launch_magiskhide();
 		break;
 	case STOP_MAGISKHIDE:
-		res = stop_magiskhide();
+		res = HIDE_NO_SUPPORT;
 		break;
 	case ADD_HIDELIST:
 		res = add_list(client);
@@ -90,9 +89,9 @@ int magiskhide_main(int argc, char *argv[]) {
 		req = LAUNCH_MAGISKHIDE;
 	else if (opt == "disable"sv)
 		req = STOP_MAGISKHIDE;
-	else if (opt == "add"sv)
+	else if (opt == "add"sv && argc > 3)
 		req = ADD_HIDELIST;
-	else if (opt == "rm"sv)
+	else if (opt == "rm"sv && argc > 3)
 		req = RM_HIDELIST;
 	else if (opt == "ls"sv)
 		req = LS_HIDELIST;
@@ -117,8 +116,9 @@ int magiskhide_main(int argc, char *argv[]) {
 	write_int(fd, MAGISKHIDE);
 	write_int(fd, req);
 	if (req == ADD_HIDELIST || req == RM_HIDELIST) {
-		write_string(fd, argv[2]);
-		write_string(fd, argv[3] ? argv[3] : "");
+		write_int(fd, parse_int(argv[2]));
+		write_string(fd, argv[3]);
+		write_string(fd, argv[4] ? argv[4] : "");
 	}
 	if (req == LS_HIDELIST)
 		send_fd(fd, STDOUT_FILENO);
@@ -145,6 +145,9 @@ int magiskhide_main(int argc, char *argv[]) {
 		break;
 	case HIDE_INVALID_PKG:
 		fprintf(stderr, "Invalid package / process name\n");
+		break;
+	case HIDE_NO_SUPPORT:
+		fprintf(stderr, "Magisk Lite no support this\n");
 		break;
 	case ROOT_REQUIRED:
 		fprintf(stderr, "Root is required for this operation\n");
