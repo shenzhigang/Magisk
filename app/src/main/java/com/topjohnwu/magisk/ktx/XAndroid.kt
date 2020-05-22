@@ -6,9 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.content.pm.ApplicationInfo
-import android.content.pm.ComponentInfo
-import android.content.pm.PackageManager
+import android.content.pm.*
 import android.content.pm.PackageManager.*
 import android.content.res.Configuration
 import android.content.res.Resources
@@ -75,7 +73,10 @@ val ApplicationInfo.processes: List<String> @SuppressLint("InlinedApi") get() {
             runCatching { providers = pm.getPackageInfo(packageName, GET_PROVIDERS).providers }
         }
     }
-    fun Array<out ComponentInfo>.processNames() = map { it.processName ?: appProcessName }
+    fun Array<out ComponentInfo>.processNames() = mapNotNull {
+        if (it is ServiceInfo && it.flags and ServiceInfo.FLAG_ISOLATED_PROCESS != 0) null
+        else it.processName ?: appProcessName
+    }
     return with(packageInfo) {
         activities?.processNames().orEmpty() +
         services?.processNames().orEmpty() +

@@ -9,11 +9,13 @@ import com.topjohnwu.magisk.ktx.getLabel
 class HideTarget(line: String) {
     val packageName: String
     val process: String
+    val uid: Int
 
     init {
-        val split = line.split(Regex("\\|"), 2)
-        packageName = split[0]
-        process = split.getOrElse(1) { packageName }
+        val split = line.split(Regex("\\|"), 3)
+        uid = split[0].toInt()
+        packageName = split[1]
+        process = split.getOrElse(2) { packageName }
     }
 }
 
@@ -36,6 +38,7 @@ class HideAppInfo(info: ApplicationInfo, pm: PackageManager)
 data class HideProcessInfo(
     val name: String,
     val packageName: String,
+    val uid: Int,
     val isHidden: Boolean
 )
 

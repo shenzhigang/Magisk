@@ -82,10 +82,10 @@ class HideViewModel : BaseViewModel(), Queryable {
 
     private fun createTarget(info: HideAppInfo, hideList: List<HideTarget>): HideAppTarget {
         val pkg = info.packageName
-        val hidden = hideList.filter { it.packageName == pkg }
+        val hidden = hideList.filter { it.packageName == pkg && it.uid == info.uid}
         val processNames = info.processes.distinct()
         val processes = processNames.map { name ->
-            HideProcessInfo(name, pkg, hidden.any { name == it.process })
+            HideProcessInfo(name, pkg, info.uid, hidden.any { name == it.process })
         }
         return HideAppTarget(info, processes)
     }

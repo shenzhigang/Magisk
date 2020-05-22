@@ -3,6 +3,7 @@ package com.topjohnwu.magisk.core.tasks
 import android.app.ProgressDialog
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build.VERSION.SDK_INT
 import android.widget.Toast
 import com.topjohnwu.magisk.BuildConfig.APPLICATION_ID
@@ -121,6 +122,8 @@ object HideAPK {
 
         context.apply {
             val intent = packageManager.getLaunchIntentForPackage(pkg) ?: return false
+            val uid = packageManager.getApplicationInfo(pkg, 0).uid
+            Shell.su("magiskhide add $uid $pkg").exec()
             Config.suManager = pkg
             grantUriPermission(pkg, APK_URI, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             grantUriPermission(pkg, PREFS_URI, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -166,6 +169,8 @@ object HideAPK {
 
         context.apply {
             val intent = packageManager.getLaunchIntentForPackage(APPLICATION_ID) ?: return false
+            val uid = packageManager.getApplicationInfo(APPLICATION_ID, 0).uid
+            Shell.su("magiskhide add $uid $APPLICATION_ID").exec()
             Config.suManager = ""
             grantUriPermission(APPLICATION_ID, APK_URI, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             grantUriPermission(APPLICATION_ID, PREFS_URI, Intent.FLAG_GRANT_READ_URI_PERMISSION)

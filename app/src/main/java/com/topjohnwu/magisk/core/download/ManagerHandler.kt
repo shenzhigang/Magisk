@@ -1,6 +1,7 @@
 package com.topjohnwu.magisk.core.download
 
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.core.net.toFile
 import com.topjohnwu.magisk.BuildConfig
 import com.topjohnwu.magisk.DynAPK

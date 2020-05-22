@@ -94,8 +94,8 @@ class HideProcessItem(
     var isHidden = process.isHidden
         set(value) = set(value, field, { field = it }, BR.hidden) {
             val arg = if (isHidden) "add" else "rm"
-            val (name, pkg) = process
-            Shell.su("magiskhide --$arg $pkg $name").submit()
+            val (name, pkg, uid) = process
+            Shell.su("magiskhide --$arg $uid $pkg $name").submit()
         }
 
     fun toggle() {
