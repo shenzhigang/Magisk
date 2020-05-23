@@ -32,25 +32,11 @@
         <!-- Main -->
         <activity android:name="a.b" />
 
-        <!-- Superuser -->
-        <activity
-            android:name="a.m"
-            android:directBootAware="true"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            tools:ignore="AppLinkUrlError">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-            </intent-filter>
-        </activity>
-
         <!-- Receiver -->
         <receiver
             android:name="a.h"
             android:directBootAware="true">
             <intent-filter>
-                <action android:name="android.intent.action.REBOOT" />
                 <action android:name="android.intent.action.LOCALE_CHANGED" />
             </intent-filter>
             <intent-filter>
