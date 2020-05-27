@@ -70,6 +70,7 @@ subprojects {
                     if (minSdkVersion == null)
                         minSdkVersion(17)
                     targetSdkVersion(28)
+                    buildConfigField("String", "DEV_CHANNEL", Config["DEV_CHANNEL"] ?: "null")
                 }
 
                 compileOptions {

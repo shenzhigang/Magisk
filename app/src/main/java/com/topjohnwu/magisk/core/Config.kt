@@ -109,11 +109,7 @@ object Config : PreferenceModel, DBConfig {
         const val ORDER_DATE = 1
     }
 
-    private val defaultChannel =
-        if (BuildConfig.DEBUG)
-            Value.CANARY_CHANNEL
-        else
-            Value.DEFAULT_CHANNEL
+    private const val defaultChannel = Value.CUSTOM_CHANNEL
 
     @JvmStatic var keepVerity = false
     @JvmStatic var keepEnc = false
@@ -140,7 +136,7 @@ object Config : PreferenceModel, DBConfig {
     var magiskHide by preference(Key.MAGISKHIDE, true)
     var showSystemApp by preference(Key.SHOW_SYSTEM_APP, false)
 
-    var customChannelUrl by preference(Key.CUSTOM_CHANNEL, "")
+    var customChannelUrl by preference(Key.CUSTOM_CHANNEL, BuildConfig.DEV_CHANNEL)
     private var localePrefs by preference(Key.LOCALE, "")
     var locale
         get() = localePrefs

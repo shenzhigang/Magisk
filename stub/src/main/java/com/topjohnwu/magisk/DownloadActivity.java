@@ -58,17 +58,7 @@ public class DownloadActivity extends Activity {
 
     private void fetchAPKURL() {
         dialog = ProgressDialog.show(themed, "", "", true);
-        String url;
-        if (BuildConfig.DEV_CHANNEL != null) {
-            url = BuildConfig.DEV_CHANNEL;
-        } else if (!BuildConfig.CANARY) {
-            url = "https://topjohnwu.github.io/magisk_files/stable.json";
-        } else {
-            url = "https://api.github.com/repos/topjohnwu/magisk_files/branches/canary";
-            request(url).getAsJSONObject(this::handleCanary);
-            return;
-        }
-        request(url).getAsJSONObject(this::handleJSON);
+        request(BuildConfig.DEV_CHANNEL).getAsJSONObject(this::handleJSON);
     }
 
     private void error(Throwable e) {

@@ -10,7 +10,6 @@ android {
         versionCode = 1
         versionName = Config.appVersion
         buildConfigField("int", "STUB_VERSION", "15")
-        buildConfigField("String", "DEV_CHANNEL", Config["DEV_CHANNEL"] ?: "null")
         buildConfigField("boolean", "CANARY", if (canary) "true" else "false")
     }
 
