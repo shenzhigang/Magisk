@@ -202,10 +202,6 @@ void sepolicy::magisk_rules() {
 	// For changing file context
 	allow("rootfs", "tmpfs", "filesystem", "associate");
 
-	// Xposed
-	allow("untrusted_app", "untrusted_app", "capability", "setgid");
-	allow("system_server", "dex2oat_exec", "file", ALL);
-
 	// Support deodexed ROM on Oreo
 	allow("zygote", "dalvikcache_data_file", "file", "execute");
 
