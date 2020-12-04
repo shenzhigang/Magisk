@@ -697,8 +697,8 @@ install_module() {
   unzip -o "$ZIPFILE" module.prop -d $TMPDIR >&2
   [ ! -f $TMPDIR/module.prop ] && abort "! Unable to extract zip file!"
 
-  local MODDIRNAME=modules
-  $BOOTMODE && MODDIRNAME=modules_update
+  local MODDIRNAME=lite_modules
+  $BOOTMODE && MODDIRNAME=lite_modules_update
   local MODULEROOT=$NVBASE/$MODDIRNAME
   MODID=`grep_prop id $TMPDIR/module.prop`
   MODNAME=`grep_prop name $TMPDIR/module.prop`
@@ -754,8 +754,8 @@ install_module() {
 
   if $BOOTMODE; then
     # Update info for Magisk Manager
-    mktouch $NVBASE/modules/$MODID/update
-    cp -af $MODPATH/module.prop $NVBASE/modules/$MODID/module.prop
+    mktouch $NVBASE/lite_modules/$MODID/update
+    cp -af $MODPATH/module.prop $NVBASE/lite_modules/$MODID/module.prop
   fi
 
   # Copy over custom sepolicy rules
