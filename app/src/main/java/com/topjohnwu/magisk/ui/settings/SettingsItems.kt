@@ -5,7 +5,6 @@ import android.os.Build
 import android.view.LayoutInflater
 import androidx.databinding.Bindable
 import com.topjohnwu.magisk.BR
-import com.topjohnwu.magisk.BuildConfig
 import com.topjohnwu.magisk.R
 import com.topjohnwu.magisk.core.Config
 import com.topjohnwu.magisk.core.Const
@@ -147,12 +146,10 @@ object UpdateChannel : BaseSettingsItem.Selector() {
         }
 
     override val title = R.string.settings_update_channel_title.asTransitive()
-    override val entries: Array<String> = resources.getStringArray(R.array.update_channel).let {
-        if (BuildConfig.DEBUG) it.toMutableList().apply { add("Canary") }.toTypedArray() else it
-    }
+    override val entries: Array<String> = resources.getStringArray(R.array.update_channel)
     override val description
         get() = entries.getOrNull(value)?.asTransitive()
-            ?: TransitiveText.String(if (value == -1) entries[0] else "Canary")
+            ?: TransitiveText.String(if (value == -1) entries[0] else "")
 }
 
 object UpdateChannelUrl : BaseSettingsItem.Input() {

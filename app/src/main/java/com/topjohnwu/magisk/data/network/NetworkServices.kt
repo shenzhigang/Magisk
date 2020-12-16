@@ -11,6 +11,7 @@ private const val REVISION = "revision"
 private const val BRANCH = "branch"
 private const val REPO = "repo"
 
+const val MAGISK_ALPHA = "vvb2060/magisk_files"
 const val MAGISK_FILES = "topjohnwu/magisk_files"
 const val MAGISK_MAIN = "topjohnwu/Magisk"
 
@@ -35,6 +36,9 @@ interface JSDelivrServices {
 
     @GET("$MAGISK_FILES@{$REVISION}/canary.json")
     suspend fun fetchCanaryUpdate(@Path(REVISION) revision: String): UpdateInfo
+
+    @GET("$MAGISK_ALPHA@{$REVISION}/alpha.json")
+    suspend fun fetchAlphaUpdate(@Path(REVISION) revision: String): UpdateInfo
 
     @GET("$MAGISK_MAIN@{$REVISION}/scripts/module_installer.sh")
     @Streaming

@@ -31,7 +31,7 @@ import static com.topjohnwu.magisk.R.string.upgrade_msg;
 public class DownloadActivity extends Activity {
 
     private static final String APP_NAME = "Magisk Manager";
-    private static final String CDN_URL = "https://cdn.jsdelivr.net/gh/topjohnwu/magisk_files@%s/%s";
+    private static final String CDN_URL = "https://cdn.jsdelivr.net/gh/vvb2060/magisk_files@%s/%s";
 
     private String apkLink;
     private String sha;
@@ -58,17 +58,8 @@ public class DownloadActivity extends Activity {
 
     private void fetchAPKURL() {
         dialog = ProgressDialog.show(themed, "", "", true);
-        String url;
-        if (BuildConfig.DEV_CHANNEL != null) {
-            url = BuildConfig.DEV_CHANNEL;
-        } else if (!BuildConfig.CANARY) {
-            url = "https://topjohnwu.github.io/magisk_files/stable.json";
-        } else {
-            url = "https://api.github.com/repos/topjohnwu/magisk_files/branches/canary";
-            request(url).getAsJSONObject(this::handleCanary);
-            return;
-        }
-        request(url).getAsJSONObject(this::handleJSON);
+        String url = "https://api.github.com/repos/vvb2060/magisk_files/branches/alpha";
+        request(url).getAsJSONObject(this::handleCanary);
     }
 
     private void error(Throwable e) {
@@ -83,7 +74,7 @@ public class DownloadActivity extends Activity {
     private void handleCanary(JSONObject json) {
         try {
             sha = json.getJSONObject("commit").getString("sha");
-            String url = String.format(CDN_URL, sha, "canary.json");
+            String url = String.format(CDN_URL, sha, "alpha.json");
             request(url).getAsJSONObject(this::handleJSON);
         } catch (JSONException e) {
             error(e);

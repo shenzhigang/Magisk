@@ -1,6 +1,7 @@
 package com.topjohnwu.magisk.data.repository
 
 import com.topjohnwu.magisk.core.Config
+import com.topjohnwu.magisk.core.Config.Value.ALPHA_CHANNEL
 import com.topjohnwu.magisk.core.Config.Value.BETA_CHANNEL
 import com.topjohnwu.magisk.core.Config.Value.CANARY_CHANNEL
 import com.topjohnwu.magisk.core.Config.Value.CUSTOM_CHANNEL
@@ -27,6 +28,7 @@ class NetworkService(
             DEFAULT_CHANNEL, STABLE_CHANNEL -> fetchStableUpdate()
             BETA_CHANNEL -> fetchBetaUpdate()
             CANARY_CHANNEL -> fetchCanaryUpdate()
+            ALPHA_CHANNEL -> fetchAlphaUpdate()
             CUSTOM_CHANNEL -> fetchCustomUpdate(Config.customChannelUrl)
             else -> throw IllegalArgumentException()
         }
@@ -49,6 +51,20 @@ class NetworkService(
 
         fun genCDNUrl(name: String) = "${Const.Url.JS_DELIVR_URL}${MAGISK_FILES}@${sha}/${name}"
         fun MagiskJson.updateCopy() = copy(link = genCDNUrl(link), note = genCDNUrl(note))
+        fun StubJson.updateCopy() = copy(link = genCDNUrl(link))
+
+        return info.copy(
+            magisk = info.magisk.updateCopy(),
+            stub = info.stub.updateCopy()
+        )
+    }
+
+    private suspend fun fetchAlphaUpdate(): UpdateInfo {
+        val sha = fetchAlphaVersion()
+        val info = jsd.fetchAlphaUpdate(sha)
+
+        fun genCDNUrl(name: String) = "${Const.Url.JS_DELIVR_URL}${MAGISK_ALPHA}@${sha}/${name}"
+        fun MagiskJson.updateCopy() = copy(link = genCDNUrl(link))
         fun StubJson.updateCopy() = copy(link = genCDNUrl(link))
 
         return info.copy(
@@ -90,5 +106,6 @@ class NetworkService(
     suspend fun fetchString(url: String) = wrap { raw.fetchString(url) }
 
     private suspend fun fetchCanaryVersion() = api.fetchBranch(MAGISK_FILES, "canary").commit.sha
+    private suspend fun fetchAlphaVersion() = api.fetchBranch(MAGISK_ALPHA, "alpha").commit.sha
     private suspend fun fetchMainVersion() = api.fetchBranch(MAGISK_MAIN, "master").commit.sha
 }
