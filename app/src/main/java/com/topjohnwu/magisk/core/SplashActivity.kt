@@ -5,8 +5,6 @@ import android.content.Context
 import android.os.Bundle
 import com.topjohnwu.magisk.BuildConfig.APPLICATION_ID
 import com.topjohnwu.magisk.R
-import com.topjohnwu.magisk.data.repository.NetworkService
-import com.topjohnwu.magisk.ktx.get
 import com.topjohnwu.magisk.ui.MainActivity
 import com.topjohnwu.magisk.view.Notifications
 import com.topjohnwu.magisk.view.Shortcuts
@@ -55,9 +53,6 @@ open class SplashActivity : Activity() {
         Notifications.setup(this)
         UpdateCheckService.schedule(this)
         Shortcuts.setupDynamic(this)
-
-        // Pre-fetch network services
-        get<NetworkService>()
 
         DONE = true
 

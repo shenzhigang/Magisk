@@ -58,6 +58,9 @@ fi
 BOOTIMAGE="$1"
 [ -e "$BOOTIMAGE" ] || abort "$BOOTIMAGE does not exist!"
 
+MAGISKBOOT="./magiskboot"
+[ -n "$2" ] && MAGISKBOOT="$2"
+
 # Flags
 [ -z $KEEPVERITY ] && KEEPVERITY=false
 [ -z $KEEPFORCEENCRYPT ] && KEEPFORCEENCRYPT=false
@@ -77,7 +80,7 @@ chmod -R 755 .
 CHROMEOS=false
 
 ui_print "- Unpacking boot image"
-./magiskboot unpack "$BOOTIMAGE"
+$MAGISKBOOT unpack "$BOOTIMAGE"
 
 case $? in
   1 )
@@ -98,7 +101,7 @@ esac
 # Test patch status and do restore
 ui_print "- Checking ramdisk status"
 if [ -e ramdisk.cpio ]; then
-  ./magiskboot cpio ramdisk.cpio test
+  $MAGISKBOOT cpio ramdisk.cpio test
   STATUS=$?
 else
   # Stock A only system-as-root
@@ -107,15 +110,15 @@ fi
 case $((STATUS & 3)) in
   0 )  # Stock boot
     ui_print "- Stock boot image detected"
-    SHA1=`./magiskboot sha1 "$BOOTIMAGE" 2>/dev/null`
+    SHA1=`$MAGISKBOOT sha1 "$BOOTIMAGE" 2>/dev/null`
     cat $BOOTIMAGE > stock_boot.img
     cp -af ramdisk.cpio ramdisk.cpio.orig 2>/dev/null
     ;;
   1 )  # Magisk patched
     ui_print "- Magisk patched boot image detected"
     # Find SHA1 of stock boot image
-    [ -z $SHA1 ] && SHA1=`./magiskboot cpio ramdisk.cpio sha1 2>/dev/null`
-    ./magiskboot cpio ramdisk.cpio restore
+    [ -z $SHA1 ] && SHA1=`$MAGISKBOOT cpio ramdisk.cpio sha1 2>/dev/null`
+    $MAGISKBOOT cpio ramdisk.cpio restore
     cp -af ramdisk.cpio ramdisk.cpio.orig
     ;;
   2 )  # Unsupported
@@ -135,7 +138,7 @@ echo "KEEPFORCEENCRYPT=$KEEPFORCEENCRYPT" >> config
 echo "RECOVERYMODE=$RECOVERYMODE" >> config
 [ ! -z $SHA1 ] && echo "SHA1=$SHA1" >> config
 
-./magiskboot cpio ramdisk.cpio \
+$MAGISKBOOT cpio ramdisk.cpio \
 "add 750 init magiskinit" \
 "patch" \
 "backup ramdisk.cpio.orig" \
@@ -144,7 +147,7 @@ echo "RECOVERYMODE=$RECOVERYMODE" >> config
 
 if [ $((STATUS & 4)) -ne 0 ]; then
   ui_print "- Compressing ramdisk"
-  ./magiskboot cpio ramdisk.cpio compress
+  $MAGISKBOOT cpio ramdisk.cpio compress
 fi
 
 rm -f ramdisk.cpio.orig config
@@ -154,23 +157,23 @@ rm -f ramdisk.cpio.orig config
 #################
 
 for dt in dtb kernel_dtb extra recovery_dtbo; do
-  [ -f $dt ] && ./magiskboot dtb $dt patch && ui_print "- Patch fstab in $dt"
+  [ -f $dt ] && $MAGISKBOOT dtb $dt patch && ui_print "- Patch fstab in $dt"
 done
 
 if [ -f kernel ]; then
   # Remove Samsung RKP
-  ./magiskboot hexpatch kernel \
+  $MAGISKBOOT hexpatch kernel \
   49010054011440B93FA00F71E9000054010840B93FA00F7189000054001840B91FA00F7188010054 \
   A1020054011440B93FA00F7140020054010840B93FA00F71E0010054001840B91FA00F7181010054
 
   # Remove Samsung defex
   # Before: [mov w2, #-221]   (-__NR_execve)
   # After:  [mov w2, #-32768]
-  ./magiskboot hexpatch kernel 821B8012 E2FF8F12
+  $MAGISKBOOT hexpatch kernel 821B8012 E2FF8F12
 
   # Force kernel to load rootfs
   # skip_initramfs -> want_initramfs
-  ./magiskboot hexpatch kernel \
+  $MAGISKBOOT hexpatch kernel \
   736B69705F696E697472616D667300 \
   77616E745F696E697472616D667300
 fi
@@ -180,7 +183,7 @@ fi
 #################
 
 ui_print "- Repacking boot image"
-./magiskboot repack "$BOOTIMAGE" || abort "! Unable to repack boot image!"
+$MAGISKBOOT repack "$BOOTIMAGE" || abort "! Unable to repack boot image!"
 
 # Sign chromeos boot
 $CHROMEOS && sign_chromeos

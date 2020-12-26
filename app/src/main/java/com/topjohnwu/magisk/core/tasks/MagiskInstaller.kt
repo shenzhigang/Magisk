@@ -52,6 +52,7 @@ abstract class MagiskInstallImpl : KoinComponent {
     protected lateinit var installDir: File
     private lateinit var srcBoot: String
     private lateinit var zipUri: Uri
+    private lateinit var magiskboot: String
 
     protected val console: MutableList<String>
     private val logs: MutableList<String>
@@ -72,6 +73,9 @@ abstract class MagiskInstallImpl : KoinComponent {
         installDir = File(get<Context>(Protected).filesDir.parent, "install")
         "rm -rf $installDir".sh()
         installDir.mkdirs()
+        val file = File(context.applicationInfo.nativeLibraryDir, "libmagiskboot.so")
+        magiskboot = if (file.canExecute()) file.absolutePath
+        else "./magiskboot"
     }
 
     private fun findImage(): Boolean {
@@ -105,14 +109,14 @@ abstract class MagiskInstallImpl : KoinComponent {
     private fun extractZip(): Boolean {
         val arch = if (Build.VERSION.SDK_INT >= 21) {
             val abis = listOf(*Build.SUPPORTED_ABIS)
-            if (abis.contains("x86")) "x86" else "arm"
+            if (abis.contains("x86")) "x86" else "armeabi-v7a"
         } else {
-            if (Build.CPU_ABI == "x86") "x86" else "arm"
+            if (Build.CPU_ABI == "x86") "x86" else "armeabi-v7a"
         }
 
         console.add("- Device platform: " + Build.CPU_ABI)
         console.add("- Magisk Manager: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-        console.add("- Install target: ${Info.remote.magisk.version} (${Info.remote.magisk.versionCode})")
+        console.add("- Install target: ${BuildConfig.BUILDIN_MAGISK} (${BuildConfig.BUILDIN_MAGISK_CODE})")
 
         try {
             ZipInputStream(zipUri.inputStream().buffered()).use { zi ->
@@ -121,18 +125,14 @@ abstract class MagiskInstallImpl : KoinComponent {
                     if (ze.isDirectory)
                         continue
                     var name: String? = null
-                    val names = arrayOf("$arch/", "common/", "META-INF/com/google/android/update-binary")
-                    for (n in names) {
-                        ze.name.run {
-                            if (startsWith(n)) {
-                                name = substring(lastIndexOf('/') + 1)
-                            }
+                    ze.name.run {
+                        if (startsWith("lib/$arch/")) {
+                            val fileName = substring(lastIndexOf('/') + 1)
+                            name = fileName.subSequence(3, fileName.length - 3).toString()
                         }
-                        name ?: continue
-                        break
+                        if (name == null && startsWith("assets/"))
+                            name = substring(7)
                     }
-                    if (name == null && ze.name.startsWith("chromeos/"))
-                        name = ze.name
                     name?.also {
                         val dest = if (installDir is SuFile)
                             SuFile(installDir, it)
@@ -149,13 +149,16 @@ abstract class MagiskInstallImpl : KoinComponent {
             return false
         }
 
+        var apkInit = context.applicationInfo.nativeLibraryDir
         val init64 = SuFile.open(installDir, "magiskinit64")
         if (Build.VERSION.SDK_INT >= 21 && Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()) {
+            apkInit = File(apkInit, "libmagiskinit64.so").absolutePath
             init64.renameTo(SuFile.open(installDir, "magiskinit"))
         } else {
+            apkInit = File(apkInit, "libmagiskinit.so").absolutePath
             init64.delete()
         }
-        "cd $installDir; chmod 755 *".sh()
+        "cd $installDir; [ -x $apkInit ] && $apkInit -x magisk magisk; chmod 755 *".sh()
         return true
     }
 
@@ -209,9 +212,9 @@ abstract class MagiskInstallImpl : KoinComponent {
                 srcBoot = recovery.path
                 // Repack boot image to prevent restore
                 arrayOf(
-                    "./magiskboot unpack boot.img",
-                    "./magiskboot repack boot.img",
-                    "./magiskboot cleanup",
+                    "$magiskboot unpack boot.img",
+                    "$magiskboot repack boot.img",
+                    "$magiskboot cleanup",
                     "mv new-boot.img boot.img").sh()
                 SuFileInputStream(boot).use {
                     tarOut.putNextEntry(newEntry("boot.img", boot.length()))
@@ -324,8 +327,8 @@ abstract class MagiskInstallImpl : KoinComponent {
         }
 
         if (!("KEEPFORCEENCRYPT=${Config.keepEnc} KEEPVERITY=${Config.keepVerity} " +
-                "RECOVERYMODE=${Config.recovery} sh update-binary " +
-                "sh boot_patch.sh $srcBoot").sh().isSuccess) {
+                "RECOVERYMODE=${Config.recovery} " +
+                "sh boot_patch.sh $srcBoot $magiskboot").sh().isSuccess) {
             return false
         }
 
@@ -334,9 +337,8 @@ abstract class MagiskInstallImpl : KoinComponent {
         }
 
         val job = Shell.sh(
-            "./magiskboot cleanup",
-            "mv bin/busybox busybox",
-            "rm -rf magisk.apk bin boot.img update-binary",
+            "$magiskboot cleanup",
+            "rm -rf boot.img",
             "cd /")
 
         val patched = File(installDir, "new-boot.img")
@@ -344,8 +346,9 @@ abstract class MagiskInstallImpl : KoinComponent {
             console.add("- Signing boot image with verity keys")
             val signed = File(installDir, "signed.img")
             try {
-                withStreams(SuFileInputStream(patched), signed.outputStream().buffered()) {
-                    input, out -> SignBoot.doSignature(null, null, input, out, "/boot")
+                withStreams(SuFileInputStream(patched),
+                    signed.outputStream().buffered()) { input, out ->
+                    SignBoot.doSignature(null, null, input, out, "/boot")
                 }
             } catch (e: IOException) {
                 console.add("! Unable to sign image")
@@ -360,7 +363,7 @@ abstract class MagiskInstallImpl : KoinComponent {
     }
 
     private fun copySepolicyRules(): Boolean {
-        if (Info.remote.magisk.versionCode >= 21100) return true
+        if (BuildConfig.BUILDIN_MAGISK_CODE >= 21100) return true
         // Copy existing rules for migration
         "copy_sepolicy_rules".sh()
         return true
@@ -376,9 +379,8 @@ abstract class MagiskInstallImpl : KoinComponent {
     private suspend fun postOTA(): Boolean {
         val bootctl = SuFile("/data/adb/bootctl")
         try {
-            withStreams(service.fetchBootctl().byteStream(), SuFileOutputStream(bootctl)) {
-                it, out -> it.copyTo(out)
-            }
+            withStreams(service.fetchBootctl().byteStream(),
+                SuFileOutputStream(bootctl)) { it, out -> it.copyTo(out) }
         } catch (e: IOException) {
             console.add("! Unable to download bootctl")
             Timber.e(e)

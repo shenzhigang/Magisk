@@ -25,7 +25,7 @@ class UpdateCheckService(context: Context, workerParams: WorkerParameters)
         return svc.fetchUpdate()?.let {
             if (BuildConfig.VERSION_CODE < it.app.versionCode)
                 Notifications.managerUpdate(applicationContext)
-            else if (Info.env.isActive && Info.env.magiskVersionCode < it.magisk.versionCode)
+            else if (Info.env.isActive && Info.env.magiskVersionCode < BuildConfig.BUILDIN_MAGISK_CODE)
                 Notifications.magiskUpdate(applicationContext)
             Result.success()
         } ?: Result.failure()

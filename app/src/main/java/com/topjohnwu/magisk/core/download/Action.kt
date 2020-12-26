@@ -20,6 +20,9 @@ sealed class Action : Parcelable {
     object Download : Action()
 
     @Parcelize
+    object DownloadUninstaller : Action()
+
+    @Parcelize
     object Uninstall : Action()
 
     @Parcelize

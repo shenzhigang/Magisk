@@ -43,3 +43,30 @@ fun InputStream.toModule(file: Uri, installer: InputStream) {
         }
     }
 }
+
+fun InputStream.toUninstaller(file: Uri) {
+
+    val input = ZipInputStream(buffered())
+    val output = ZipOutputStream(file.outputStream().buffered())
+
+    withStreams(input, output) { zin, zout ->
+        var off = -1
+        var entry: ZipEntry? = zin.nextEntry
+        while (entry != null) {
+            if (off < 0) {
+                off = entry.name.indexOf('/') + 1
+            }
+
+            val path = entry.name.substring(off)
+            if (path.isNotEmpty() &&
+                !path.contentEquals("META-INF/com/google/android/updater-script")) {
+                zout.putNextEntry(ZipEntry(path))
+                if (!entry.isDirectory) {
+                    zin.copyTo(zout)
+                }
+            }
+
+            entry = zin.nextEntry
+        }
+    }
+}

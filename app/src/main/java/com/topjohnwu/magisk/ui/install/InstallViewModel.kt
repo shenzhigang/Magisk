@@ -1,6 +1,7 @@
 package com.topjohnwu.magisk.ui.install
 
 import android.app.Activity
+import android.content.res.Resources
 import android.net.Uri
 import androidx.databinding.Bindable
 import androidx.lifecycle.viewModelScope
@@ -11,7 +12,6 @@ import com.topjohnwu.magisk.core.Info
 import com.topjohnwu.magisk.core.download.Action
 import com.topjohnwu.magisk.core.download.DownloadService
 import com.topjohnwu.magisk.core.download.Subject
-import com.topjohnwu.magisk.data.repository.NetworkService
 import com.topjohnwu.magisk.events.MagiskInstallFileEvent
 import com.topjohnwu.magisk.events.dialog.SecondSlotWarningDialog
 import com.topjohnwu.magisk.utils.set
@@ -23,7 +23,7 @@ import java.io.IOException
 import kotlin.math.roundToInt
 
 class InstallViewModel(
-    svc: NetworkService
+    private val resources: Resources
 ) : BaseViewModel(State.LOADED) {
 
     val isRooted = Shell.rootAccess()
@@ -67,7 +67,8 @@ class InstallViewModel(
     init {
         viewModelScope.launch {
             try {
-                notes = svc.fetchString(Info.remote.magisk.note)
+                notes = resources.openRawResource(R.raw.changelog)
+                    .bufferedReader().use { it.readText() }
             } catch (e: IOException) {
                 Timber.e(e)
             }

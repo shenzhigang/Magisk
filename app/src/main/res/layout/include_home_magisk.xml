@@ -116,7 +116,7 @@
 
                             <TextView
                                 style="@style/W.Home.ItemContent.Right"
-                                android:text="@{viewModel.loadFailed ? @string/not_available : viewModel.magiskRemoteVersion }"
+                                android:text="@{viewModel.magiskRemoteVersion}"
                                 tools:text="20.1 (12345)" />
 
                         </LinearLayout>

@@ -10,22 +10,22 @@
 # Preparation
 ##############
 
-COMMONDIR=$INSTALLER/common
-APK=$COMMONDIR/magisk.apk
-CHROMEDIR=$INSTALLER/chromeos
+COMMONDIR="$INSTALLER/assets"
+APK="$3"
+CHROMEDIR="$INSTALLER/assets/chromeos"
 
 # Default permissions
 umask 022
 
 OUTFD=$2
-ZIP=$3
+ZIP="$3"
 
 if [ ! -f $COMMONDIR/util_functions.sh ]; then
   echo "! Unable to extract zip file!"
   exit 1
 fi
 
-# Load utility fuctions
+# Load utility functions
 . $COMMONDIR/util_functions.sh
 
 setup_flashable
@@ -57,8 +57,12 @@ api_level_arch_detect
 
 ui_print "- Device platform: $ARCH"
 
-BINDIR=$INSTALLER/$ARCH32
-chmod -R 755 $CHROMEDIR $BINDIR
+BINDIR="$INSTALLER/lib/$ARCH32"
+if [ ! -d "$BINDIR" ]; then BINDIR="$INSTALLER/lib/armeabi-v7a"; fi
+cd "$BINDIR"
+for file in lib*.so; do mv "$file" "${file:3:${#file}-6}"; done
+cd /
+chmod -R 755 "$CHROMEDIR" "$BINDIR"
 
 # Check if system root is installed and remove
 $BOOTMODE || remove_system_su
@@ -70,9 +74,9 @@ $BOOTMODE || remove_system_su
 ui_print "- Constructing environment"
 
 # Copy required files
-rm -rf $MAGISKBIN/* 2>/dev/null
+rm -rf ${MAGISKBIN:?}/* 2>/dev/null
 mkdir -p $MAGISKBIN 2>/dev/null
-cp -af $BINDIR/. $COMMONDIR/. $CHROMEDIR $BBBIN $MAGISKBIN
+cp -af $BINDIR/. $COMMONDIR/. $BBBIN $MAGISKBIN
 chmod -R 755 $MAGISKBIN
 
 # addon.d

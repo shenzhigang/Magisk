@@ -1,5 +1,6 @@
 package com.topjohnwu.magisk.data.repository
 
+import com.topjohnwu.magisk.BuildConfig
 import com.topjohnwu.magisk.core.Config
 import com.topjohnwu.magisk.core.Config.Value.BETA_CHANNEL
 import com.topjohnwu.magisk.core.Config.Value.CANARY_CHANNEL
@@ -28,7 +29,7 @@ class NetworkService(
             CUSTOM_CHANNEL -> fetchCustomUpdate(Config.customChannelUrl)
             else -> throw IllegalArgumentException()
         }
-        if (info.magisk.versionCode < Info.env.magiskVersionCode &&
+        if (BuildConfig.BUILDIN_MAGISK_CODE < Info.env.magiskVersionCode &&
             Config.updateChannel == DEFAULT_CHANNEL
         ) {
             Config.updateChannel = BETA_CHANNEL
@@ -48,15 +49,11 @@ class NetworkService(
 
         fun genCDNUrl(name: String) = "${Const.Url.JS_DELIVR_URL}${MAGISK_FILES}@${sha}/${name}"
         fun ManagerJson.updateCopy() = copy(link = genCDNUrl(link), note = genCDNUrl(note))
-        fun MagiskJson.updateCopy() = copy(link = genCDNUrl(link), note = genCDNUrl(note))
         fun StubJson.updateCopy() = copy(link = genCDNUrl(link))
-        fun UninstallerJson.updateCopy() = copy(link = genCDNUrl(link))
 
         return info.copy(
             app = info.app.updateCopy(),
-            magisk = info.magisk.updateCopy(),
-            stub = info.stub.updateCopy(),
-            uninstaller = info.uninstaller.updateCopy()
+            stub = info.stub.updateCopy()
         )
     }
 

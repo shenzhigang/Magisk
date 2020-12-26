@@ -10,29 +10,36 @@
 # Preparation
 ##############
 
-# This path should work in any cases
-TMPDIR=/dev/tmp
-
-INSTALLER=$TMPDIR/install
-CHROMEDIR=$INSTALLER/chromeos
+COMMONDIR="$INSTALLER/assets"
+APK="$3"
+CHROMEDIR="$INSTALLER/assets/chromeos"
 
 # Default permissions
 umask 022
 
 OUTFD=$2
-ZIP=$3
+ZIP="$3"
 
-if [ ! -f $INSTALLER/util_functions.sh ]; then
+if [ ! -f $COMMONDIR/util_functions.sh ]; then
   echo "! Unable to extract zip file!"
   exit 1
 fi
 
 # Load utility functions
-. $INSTALLER/util_functions.sh
+. $COMMONDIR/util_functions.sh
 
 setup_flashable
 
-print_title "Magisk Uninstaller"
+############
+# Detection
+############
+
+if echo $MAGISK_VER | grep -q '\.'; then
+  PRETTY_VER=$MAGISK_VER
+else
+  PRETTY_VER="$MAGISK_VER($MAGISK_VER_CODE)"
+fi
+print_title "Magisk $PRETTY_VER Uninstaller"
 
 is_mounted /data || mount /data || abort "! Unable to mount /data, please uninstall with Magisk Manager"
 if ! $BOOTMODE; then
@@ -42,29 +49,44 @@ if ! $BOOTMODE; then
   mount_name persist /persist
 fi
 mount_partitions
-
-api_level_arch_detect
-
-ui_print "- Device platform: $ARCH"
-MAGISKBIN=$INSTALLER/$ARCH32
-mv $CHROMEDIR $MAGISKBIN
-chmod -R 755 $MAGISKBIN
-
 check_data
 $DATA_DE || abort "! Cannot access /data, please uninstall with Magisk Manager"
+get_flags
+find_boot_image
+
+[ -z $BOOTIMAGE ] && abort "! Unable to detect target image"
+ui_print "- Target image: $BOOTIMAGE"
+
+# Detect version and architecture
+api_level_arch_detect
+
+[ $API -lt 17 ] && abort "! Magisk only support Android 4.2 and above"
+
+ui_print "- Device platform: $ARCH"
+
+BINDIR="$INSTALLER/lib/$ARCH32"
+if [ ! -d "$BINDIR" ]; then BINDIR="$INSTALLER/lib/armeabi-v7a"; fi
+cd "$BINDIR"
+for file in lib*.so; do mv "$file" "${file:3:${#file}-6}"; done
+cd /
+chmod -R 755 "$CHROMEDIR" "$BINDIR"
+
+##############
+# Environment
+##############
+
+ui_print "- Constructing environment"
+
+MAGISKBIN=$BINDIR
+cp -af $COMMONDIR/. $MAGISKBIN
+chmod -R 755 $MAGISKBIN
+
 $BOOTMODE || recovery_actions
 run_migrations
 
 ############
 # Uninstall
 ############
-
-get_flags
-find_boot_image
-
-[ -e $BOOTIMAGE ] || abort "! Unable to detect boot image"
-ui_print "- Found target image: $BOOTIMAGE"
-[ -z $DTBOIMAGE ] || ui_print "- Found dtbo image: $DTBOIMAGE"
 
 cd $MAGISKBIN
 
@@ -163,7 +185,10 @@ if $BOOTMODE; then
   ui_print "********************************************"
   (sleep 8; /system/bin/reboot)&
 else
-  rm -rf /data/data/*magisk* /data/user*/*/*magisk* /data/app/*magisk* /data/app/*/*magisk*
+  ui_print "********************************************"
+  ui_print " Magisk Manager will not auto uninstall, "
+  ui_print " please uninstall it manually after reboot."
+  ui_print "********************************************"
   recovery_cleanup
   ui_print "- Done"
 fi

@@ -9,7 +9,6 @@ import com.topjohnwu.magisk.core.Config
 import com.topjohnwu.magisk.core.Info
 import com.topjohnwu.magisk.core.download.Subject
 import com.topjohnwu.magisk.core.download.Subject.Manager
-import com.topjohnwu.magisk.core.model.MagiskJson
 import com.topjohnwu.magisk.core.model.ManagerJson
 import com.topjohnwu.magisk.data.repository.NetworkService
 import com.topjohnwu.magisk.events.OpenInappLinkEvent
@@ -46,9 +45,7 @@ class HomeViewModel(
     var stateManager = MagiskState.LOADING
         set(value) = set(value, field, { field = it }, BR.stateManager)
 
-    @get:Bindable
-    var magiskRemoteVersion = R.string.loading.res()
-        set(value) = set(value, field, { field = it }, BR.magiskRemoteVersion)
+    val magiskRemoteVersion = "${BuildConfig.BUILDIN_MAGISK} (${BuildConfig.BUILDIN_MAGISK_CODE})"
 
     val magiskInstalledVersion get() =
         "${Info.env.magiskVersionString} (${Info.env.magiskVersionCode})"
@@ -67,7 +64,7 @@ class HomeViewModel(
         set(value) = set(value, field, { field = it }, BR.stateManagerProgress)
 
     @get:Bindable
-    val showUninstall get() = Info.env.isActive && state != State.LOADING
+    val showUninstall get() = state != State.LOADING
 
     @get:Bindable
     val showSafetyNet get() = Info.hasGMS && isConnected.get()
@@ -84,7 +81,7 @@ class HomeViewModel(
             state = State.LOADED
             stateMagisk = when {
                 !Info.env.isActive -> MagiskState.NOT_INSTALLED
-                magisk.isObsolete -> MagiskState.OBSOLETE
+                magiskObsolete -> MagiskState.OBSOLETE
                 else -> MagiskState.UP_TO_DATE
             }
 
@@ -93,8 +90,6 @@ class HomeViewModel(
                 else -> MagiskState.UP_TO_DATE
             }
 
-            magiskRemoteVersion =
-                "${magisk.version} (${magisk.versionCode})"
             managerRemoteVersion =
                 "${app.version} (${app.versionCode}) (${stub.versionCode})"
 
@@ -102,6 +97,7 @@ class HomeViewModel(
                 ensureEnv()
             }
         } ?: apply { state = State.LOADING_FAILED }
+        notifyPropertyChanged(BR.managerRemoteVersion)
         notifyPropertyChanged(BR.showUninstall)
         notifyPropertyChanged(BR.showSafetyNet)
     }
@@ -160,8 +156,8 @@ class HomeViewModel(
         }
     }
 
-    private val MagiskJson.isObsolete
-        get() = Info.env.isActive && Info.env.magiskVersionCode < versionCode
+    private val magiskObsolete
+        get() = Info.env.isActive && Info.env.magiskVersionCode < BuildConfig.BUILDIN_MAGISK_CODE
     private val ManagerJson.isObsolete
         get() = BuildConfig.VERSION_CODE < versionCode
 

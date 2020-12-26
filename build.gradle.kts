@@ -27,7 +27,7 @@ buildscript {
     }
 }
 
-tasks.register("clean", Delete::class) {
+tasks.register<Delete>("clean") {
     delete(rootProject.buildDir)
 }
 
@@ -63,13 +63,13 @@ subprojects {
             plugins.hasPlugin("com.android.application")) {
             android.apply {
                 compileSdkVersion(30)
-                buildToolsVersion = "30.0.2"
+                buildToolsVersion = "30.0.3"
                 ndkPath = "${System.getenv("ANDROID_SDK_ROOT")}/ndk/magisk"
 
                 defaultConfig {
                     if (minSdkVersion == null)
                         minSdkVersion(17)
-                    targetSdkVersion(28)
+                    targetSdkVersion(30)
                     buildConfigField("String", "DEV_CHANNEL", Config["DEV_CHANNEL"] ?: "null")
                 }
 

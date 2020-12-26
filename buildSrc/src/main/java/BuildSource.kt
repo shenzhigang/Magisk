@@ -20,11 +20,15 @@ object Config {
 
     val appVersion: String get() = get("appVersion") ?: commitHash
     val appVersionCode: Int get() = commitCount
+
+    val magiskVersion: String get() = get("version") ?: commitHash
+    val magiskVersionCode: Int get() = get("magisk.versionCode")?.toInt() ?: Int.MAX_VALUE
 }
 
 class MagiskPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val configPath: String? by project
+        project.rootProject.file("gradle.properties").inputStream().use { props.load(it) }
         val config = configPath?.let { File(it) } ?: project.rootProject.file("config.prop")
         if (config.exists())
             config.inputStream().use { props.load(it) }

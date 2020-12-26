@@ -7,8 +7,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
 import com.topjohnwu.magisk.R
 import com.topjohnwu.magisk.core.ForegroundTracker
+import com.topjohnwu.magisk.core.ResMgr
 import com.topjohnwu.magisk.core.base.BaseService
-import com.topjohnwu.magisk.core.utils.MediaStoreUtils.checkSum
 import com.topjohnwu.magisk.core.utils.MediaStoreUtils.outputStream
 import com.topjohnwu.magisk.core.utils.ProgressInputStream
 import com.topjohnwu.magisk.data.repository.NetworkService
@@ -22,6 +22,7 @@ import okhttp3.ResponseBody
 import org.koin.android.ext.android.inject
 import org.koin.core.KoinComponent
 import timber.log.Timber
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.util.*
@@ -69,17 +70,20 @@ abstract class BaseDownloader : BaseService(), KoinComponent {
     // -- Download logic
 
     private suspend fun Subject.startDownload() {
-        val skip = this is Subject.Magisk && file.checkSum("MD5", magisk.md5)
-        if (!skip) {
-            val stream = service.fetchFile(url).toProgressStream(this)
-            when (this) {
-                is Subject.Module ->  // Download and process on-the-fly
-                    stream.toModule(file, service.fetchInstaller().byteStream())
-                else -> {
-                    withStreams(stream, file.outputStream()) { it, out -> it.copyTo(out) }
-                    if (this is Subject.Manager)
-                        handleAPK(this)
+        when (this) {
+            is Subject.Module -> service.fetchFile(url).toProgressStream(this)
+                .toModule(file, service.fetchInstaller().byteStream())
+            is Subject.Manager -> {
+                val stream = service.fetchFile(url).toProgressStream(this)
+                withStreams(stream, file.outputStream()) { it, out -> it.copyTo(out) }
+                handleAPK(this)
+            }
+            is Subject.Magisk -> when (this.action) {
+                is Action.Uninstall, is Action.DownloadUninstaller -> {
+                    File(ResMgr.apk).inputStream().toUninstaller(file)
                 }
+                else -> withStreams(File(ResMgr.apk).inputStream(),
+                    file.outputStream()) { it, out -> it.copyTo(out) }
             }
         }
         val newId = notifyFinish(this)
@@ -148,7 +152,7 @@ abstract class BaseDownloader : BaseService(), KoinComponent {
     private fun lastNotify(
         id: Int,
         editor: (Notification.Builder) -> Notification.Builder? = { null }
-    ) : Int {
+    ): Int {
         val notification = remove(id)?.run(editor) ?: return -1
         val newId: Int = nextInt()
         notify(newId, notification.build())

@@ -599,10 +599,8 @@ def setup_ndk(args):
 def build_all(args):
     vars(args)['target'] = []
     build_stub(args)
-    build_app(args)
     build_binary(args)
-    zip_main(args)
-    zip_uninstaller(args)
+    build_app(args)
 
 
 parser = argparse.ArgumentParser(description='Magisk build script')

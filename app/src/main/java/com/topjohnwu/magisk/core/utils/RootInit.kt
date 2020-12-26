@@ -7,9 +7,12 @@ import com.topjohnwu.magisk.core.Config
 import com.topjohnwu.magisk.core.Const
 import com.topjohnwu.magisk.core.Info
 import com.topjohnwu.magisk.core.wrap
+import com.topjohnwu.magisk.di.Protected
+import com.topjohnwu.magisk.ktx.get
 import com.topjohnwu.magisk.ktx.rawResource
 import com.topjohnwu.superuser.Shell
 import com.topjohnwu.superuser.ShellUtils
+import java.io.File
 
 class RootInit : Shell.Initializer() {
 
@@ -27,13 +30,16 @@ class RootInit : Shell.Initializer() {
             }
             if (Const.Version.atLeast_21_0()) {
                 add("export ASH_STANDALONE=1")
-                add("[ -x /data/adb/magisk/busybox ] && exec /data/adb/magisk/busybox sh")
+                val busybox = File(context.applicationInfo.nativeLibraryDir, "libbusybox.so")
+                val bbPath = File(get<Context>(Protected).filesDir.parentFile, "busybox")
+                if (busybox.canExecute()) add("ln -s -f $busybox $bbPath && exec $bbPath sh")
+                else add("[ -x /data/adb/magisk/busybox ] && exec /data/adb/magisk/busybox sh")
             } else {
                 add("export PATH=\"\$MAGISKTMP/busybox:\$PATH\"")
             }
             add(context.rawResource(R.raw.manager))
             if (shell.isRoot) {
-                add(context.rawResource(R.raw.util_functions))
+                add(context.assets.open("util_functions.sh"))
             }
             add("mm_init")
         }.exec()

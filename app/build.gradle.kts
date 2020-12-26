@@ -24,6 +24,8 @@ android {
         multiDexEnabled = true
         versionName = Config.appVersion
         versionCode = Config.appVersionCode
+        buildConfigField("String", "BUILDIN_MAGISK", "\"${Config.magiskVersion}\"")
+        buildConfigField("int", "BUILDIN_MAGISK_CODE", Config.magiskVersionCode.toString())
 
         javaCompileOptions.annotationProcessorOptions.arguments(
             mapOf("room.incremental" to "true")
@@ -51,7 +53,7 @@ android {
     }
 
     packagingOptions {
-        exclude("/META-INF/**")
+        exclude("/META-INF/*")
         exclude("/org/bouncycastle/**")
         exclude("/kotlin/**")
         exclude("/kotlinx/**")
@@ -64,11 +66,6 @@ android {
         jvmTarget = "1.8"
     }
 }
-
-tasks["preBuild"]?.dependsOn(tasks.register("copyUtils", Copy::class) {
-    from(rootProject.file("scripts/util_functions.sh"))
-    into("src/main/res/raw")
-})
 
 android.applicationVariants.all {
     val keysDir = rootProject.file("tools/keys")
@@ -107,9 +104,9 @@ android.applicationVariants.all {
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
     implementation(kotlin("stdlib"))
     implementation(project(":app:shared"))
+    implementation(project(":app:zip"))
 
     implementation("com.github.topjohnwu:jtar:1.0.0")
     implementation("com.github.topjohnwu:indeterminate-checkbox:1.0.7")

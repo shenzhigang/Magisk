@@ -16,14 +16,17 @@ class UninstallDialog : DialogEvent() {
     override fun build(dialog: MagiskDialog) {
         dialog.applyTitle(R.string.uninstall_magisk_title)
             .applyMessage(R.string.uninstall_magisk_msg)
-            .applyButton(MagiskDialog.ButtonType.POSITIVE) {
-                titleRes = R.string.restore_img
-                onClick { restore() }
+            .applyButton(MagiskDialog.ButtonType.NEUTRAL) {
+                titleRes = R.string.save_uninstaller
+                onClick { DownloadService.start(dialog.context, Subject.Magisk(Action.DownloadUninstaller)) }
             }
-        if (Info.remote.uninstaller.link.isNotEmpty()) {
+        if (Info.env.isActive) {
             dialog.applyButton(MagiskDialog.ButtonType.NEGATIVE) {
                 titleRes = R.string.complete_uninstall
-                onClick { completeUninstall() }
+                onClick { DownloadService.start(dialog.context, Subject.Magisk(Action.Uninstall)) }
+            }.applyButton(MagiskDialog.ButtonType.POSITIVE) {
+                titleRes = R.string.restore_img
+                onClick { restore() }
             }
         }
     }
@@ -44,9 +47,4 @@ class UninstallDialog : DialogEvent() {
             }
         }
     }
-
-    private fun completeUninstall() {
-        DownloadService.start(dialog.context, Subject.Magisk(Action.Uninstall))
-    }
-
 }

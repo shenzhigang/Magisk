@@ -20,7 +20,6 @@ import com.topjohnwu.magisk.R
 import com.topjohnwu.magisk.core.download.DownloadService
 import com.topjohnwu.magisk.core.utils.refreshLocale
 import com.topjohnwu.magisk.core.utils.updateConfig
-import com.topjohnwu.magisk.ktx.forceGetDeclaredField
 import com.topjohnwu.magisk.ui.MainActivity
 import com.topjohnwu.magisk.ui.surequest.SuRequestActivity
 
@@ -137,8 +136,12 @@ private class JobSchedulerWrapper(private val base: JobScheduler) : JobScheduler
             service.packageName,
             Info.stubChk.classToComponent[name] ?: name
         )
-
-        javaClass.forceGetDeclaredField("service")?.set(this, component)
+        runCatching {
+            javaClass.getDeclaredField("service").apply {
+                isAccessible = true
+                set(this@patch, component)
+            }
+        }
         return this
     }
 }

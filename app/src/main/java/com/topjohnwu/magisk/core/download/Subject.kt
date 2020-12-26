@@ -4,8 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.os.Parcelable
 import androidx.core.net.toUri
+import com.topjohnwu.magisk.BuildConfig
 import com.topjohnwu.magisk.core.Info
-import com.topjohnwu.magisk.core.model.MagiskJson
 import com.topjohnwu.magisk.core.model.ManagerJson
 import com.topjohnwu.magisk.core.model.StubJson
 import com.topjohnwu.magisk.core.model.module.OnlineModule
@@ -19,7 +19,6 @@ private fun cachedFile(name: String) = get<Context>().cachedFile(name).apply { d
 
 sealed class Subject : Parcelable {
 
-    abstract val url: String
     abstract val file: Uri
     abstract val action: Action
     abstract val title: String
@@ -29,7 +28,7 @@ sealed class Subject : Parcelable {
         val module: OnlineModule,
         override val action: Action
     ) : Subject() {
-        override val url: String get() = module.zip_url
+        val url: String get() = module.zip_url
         override val title: String get() = module.downloadFilename
 
         @IgnoredOnParcel
@@ -45,7 +44,7 @@ sealed class Subject : Parcelable {
     ) : Subject() {
         override val action get() = Action.Download
         override val title: String get() = "MagiskManager-${app.version}(${app.versionCode})"
-        override val url: String get() = app.link
+        val url: String get() = app.link
 
         @IgnoredOnParcel
         override val file by lazy {
@@ -56,14 +55,12 @@ sealed class Subject : Parcelable {
 
     abstract class Magisk : Subject() {
 
-        val magisk: MagiskJson = Info.remote.magisk
-
         @Parcelize
         private class Internal(
             override val action: Action
         ) : Magisk() {
-            override val url: String get() = magisk.link
-            override val title: String get() = "Magisk-${magisk.version}(${magisk.versionCode})"
+            override val title: String
+                get() = "Magisk-${BuildConfig.BUILDIN_MAGISK}(${BuildConfig.BUILDIN_MAGISK_CODE})"
 
             @IgnoredOnParcel
             override val file by lazy {
@@ -74,21 +71,31 @@ sealed class Subject : Parcelable {
         @Parcelize
         private class Uninstall : Magisk() {
             override val action get() = Action.Uninstall
-            override val url: String get() = Info.remote.uninstaller.link
             override val title: String get() = "uninstall.zip"
 
             @IgnoredOnParcel
             override val file by lazy {
                 cachedFile(title)
             }
-
         }
 
         @Parcelize
         private class Download : Magisk() {
             override val action get() = Action.Download
-            override val url: String get() = magisk.link
-            override val title: String get() = "Magisk-${magisk.version}(${magisk.versionCode}).zip"
+            override val title: String
+                get() = "Magisk-${BuildConfig.BUILDIN_MAGISK}(${BuildConfig.BUILDIN_MAGISK_CODE}).zip"
+
+            @IgnoredOnParcel
+            override val file by lazy {
+                MediaStoreUtils.getFile(title).uri
+            }
+        }
+
+        @Parcelize
+        private class DownloadUninstaller : Magisk() {
+            override val action get() = Action.DownloadUninstaller
+            override val title: String
+                get() = "MagiskUninstaller-${BuildConfig.BUILDIN_MAGISK}(${BuildConfig.BUILDIN_MAGISK_CODE}).zip"
 
             @IgnoredOnParcel
             override val file by lazy {
@@ -99,6 +106,7 @@ sealed class Subject : Parcelable {
         companion object {
             operator fun invoke(config: Action) = when (config) {
                 Action.Download -> Download()
+                Action.DownloadUninstaller -> DownloadUninstaller()
                 Action.Uninstall -> Uninstall()
                 Action.EnvFix, is Action.Flash, is Action.Patch -> Internal(config)
             }
