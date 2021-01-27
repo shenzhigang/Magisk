@@ -98,18 +98,11 @@ object Hide : BaseSettingsItem.Input() {
 
     override fun getView(context: Context) = DialogSettingsAppNameBinding
         .inflate(LayoutInflater.from(context)).also { it.data = this }.root
-
-    override fun refresh() {
-        isEnabled = Info.remote.stub.versionCode > 0
-    }
 }
 
 object Restore : BaseSettingsItem.Blank() {
     override val title = R.string.settings_restore_manager_title.asTransitive()
     override val description = R.string.settings_restore_manager_summary.asTransitive()
-    override fun refresh() {
-        isEnabled = Info.remote.magisk.versionCode > 0
-    }
 }
 
 object AddShortcut : BaseSettingsItem.Blank() {
